@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Sandaru AI Pro - Auth Edition</title>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #121214; 
+            color: #e1e1e6; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #app-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100dvh;
+            position: relative;
+        }
+
+        /* Authentication Screen Modal */
+        #authScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #121214;
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .auth-card {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .auth-header { text-align: center; margin-bottom: 20px; }
+        .auth-header h2 { color: #89b4fa; font-size: 22px; margin-bottom: 6px; }
+        .auth-header p { font-size: 13px; color: #a6adc8; }
+        .auth-tabs { display: flex; border-bottom: 1px solid #27272a; margin-bottom: 18px; }
+        .auth-tab { flex: 1; text-align: center; padding: 10px; font-weight: bold; font-size: 14px; cursor: pointer; color: #a6adc8; border-bottom: 2px solid transparent; }
+        .auth-tab.active { color: #89b4fa; border-color: #89b4fa; }
+        .auth-form { display: flex; flex-direction: column; gap: 12px; }
+        .auth-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #3f3f46; background: #1e1e2e; color: white; font-size: 14px; outline: none; }
+        .auth-input:focus { border-color: #89b4fa; }
+        .auth-btn { background: #89b4fa; color: #111; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; margin-top: 6px; }
+
+        /* Sidebar Drawer */
+        #sidebar { 
+            width: 280px; 
+            background: #18181b; 
+            border-right: 1px solid #27272a; 
+            display: flex; 
+            flex-direction: column; 
+            position: absolute; 
+            top: 0; bottom: 0; left: -280px; 
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+            z-index: 1000; 
+            will-change: transform;
+        }
+        #sidebar.open { transform: translateX(280px); }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid #27272a; display: flex; justify-content: space-between; align-items: center; }
+        .user-profile-box { padding: 12px; background: #27272a; margin: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .user-info { overflow: hidden; }
+        .user-name { font-weight: bold; font-size: 14px; color: #a6e3a1; }
+        .user-email { font-size: 11px; color: #a6adc8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .logout-btn { background: #f38ba8; color: #111; border: none; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .new-chat-btn { background: #89b4fa; color: #111; border: none; padding: 12px 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: calc(100% - 24px); font-size: 14px; margin: 0 12px 12px 12px; }
+        .chat-list { flex: 1; overflow-y: auto; padding: 0 12px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+        .chat-item { padding: 12px; background: #27272a; border-radius: 10px; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .chat-item.active { background: #3f3f46; border-left: 4px solid #89b4fa; }
+        .chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        .delete-btn { color: #f38ba8; margin-left: 8px; font-weight: bold; padding: 4px 8px; border-radius: 6px; }
+
+        /* Background Overlay */
+        #overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 900; backdrop-filter: blur(2px); }
+        #overlay.active { display: block; }
+
+        /* Top Header Navigation Bar */
+        #header {
+            height: 56px;
+            background: #18181b;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            border-bottom: 1px solid #27272a;
+            flex-shrink: 0;
+        }
+        .header-title { color: #89b4fa; font-weight: bold; font-size: 17px; letter-spacing: 0.5px; }
+        .icon-btn { background: #27272a; border: none; color: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .icon-btn.active { background: #a6e3a1; color: #111; font-weight: bold; }
+        .icon-btn.recording { background: #f38ba8; color: #111; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Scrollable Chat Area */
+        #chat { 
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto; 
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch; 
+            touch-action: pan-y;
+            padding: 16px;
+            display: flex; 
+            flex-direction: column; 
+            gap: 14px; 
+        }
+        
+        .msg { padding: 12px 16px; border-radius: 14px; font-size: 15px; line-height: 1.5; max-width: 88%; word-wrap: break-word; word-break: break-word; }
+        .msg img { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
+        .msg a.chat-link { color: #89b4fa; text-decoration: underline; font-weight: 600; word-break: break-all; }
+        .user { background: #2b3942; color: #a6e3a1; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .ai { background: #1e1e2e; color: #e1e1e6; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #27272a; }
+
+        /* Fixed Bottom Controls */
+        #bottomContainer {
+            background: #18181b;
+            padding: 10px;
+            border-top: 1px solid #27272a;
+            flex-shrink: 0;
+        }
+
+        .status { font-size: 12px; color: #89b4fa; text-align: center; margin-bottom: 6px; min-height: 16px; font-weight: 500; }
+
+        /* Attachment Previews */
+        .preview-box { display: none; align-items: center; gap: 10px; background: #27272a; padding: 6px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; color: #a6adc8; }
+        .preview-box img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
+        .preview-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .remove-btn { background: #f38ba8; color: #111; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+
+        /* Input Bar Controls */
+        .input-box { display: flex; gap: 6px; align-items: center; width: 100%; }
+        input[type="text"] { flex: 1; min-width: 0; padding: 12px; border-radius: 10px; border: 1px solid #3f3f46; background: #1e1e2e; color: white; font-size: 15px; outline: none; }
+        input[type="text"]:focus { border-color: #89b4fa; }
+        button.send-btn { padding: 12px 16px; border: none; background: #89b4fa; color: #111; font-weight: bold; border-radius: 10px; cursor: pointer; font-size: 15px; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+
+    <!-- Auth Modal Screen -->
+    <div id="authScreen">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>Sandaru AI</h2>
+                <p>Welcome! Please Login or Create an Account</p>
+            </div>
+
+            <div class="auth-tabs">
+                <div id="tabLogin" class="auth-tab active" onclick="switchAuthTab('login')">Login</div>
+                <div id="tabSignup" class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</div>
+            </div>
+
+            <!-- Login Form -->
+            <div id="loginForm" class="auth-form">
+                <input type="email" id="loginEmail" class="auth-input" placeholder="Email Address">
+                <input type="password" id="loginPass" class="auth-input" placeholder="Password">
+                <button class="auth-btn" onclick="doLogin()">Login</button>
+            </div>
+
+            <!-- Sign Up Form -->
+            <div id="signupForm" class="auth-form" style="display: none;">
+                <input type="text" id="signupName" class="auth-input" placeholder="Your Name">
+                <input type="email" id="signupEmail" class="auth-input" placeholder="Email Address">
+                <input type="password" id="signupPass" class="auth-input" placeholder="Create Password">
+                <button class="auth-btn" onclick="doSignUp()">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Wrapper -->
+    <div id="app-wrapper">
+        <!-- Sidebar Drawer -->
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <span style="font-weight: bold; color: #89b4fa;">Sandaru AI Menu</span>
+                <span class="icon-btn" onclick="toggleSidebar()" style="padding: 4px 8px;">✕</span>
+            </div>
+
+            <!-- Profile Info -->
+            <div class="user-profile-box">
+                <div class="user-info">
+                    <div id="profileName" class="user-name">User</div>
+                    <div id="profileEmail" class="user-email">email@example.com</div>
+                </div>
+                <button class="logout-btn" onclick="doLogout()">Logout</button>
+            </div>
+
+            <button class="new-chat-btn" onclick="createNewChat()">+ New Chat</button>
+            <div id="chatList" class="chat-list"></div>
+        </div>
+
+        <div id="overlay" onclick="toggleSidebar()"></div>
+
+        <!-- Header -->
+        <div id="header">
+            <button class="icon-btn" onclick="toggleSidebar()">☰ Menu</button>
+            <span class="header-title">Sandaru AI</span>
+            <button class="icon-btn" id="searchBtn" onclick="toggleWebSearch()">🌐 Search: OFF</button>
+            <button class="icon-btn" onclick="createNewChat()">➕</button>
+        </div>
+
+        <!-- Scrollable Chat Window -->
+        <div id="chat"></div>
+
+        <!-- Bottom Controls -->
+        <div id="bottomContainer">
+            <div id="status" class="status"></div>
+
+            <!-- Previews -->
+            <div id="imgPreviewBox" class="preview-box">
+                <img id="previewImg" src="" alt="Preview">
+                <span class="preview-text">Photo Attached</span>
+                <button class="remove-btn" onclick="removeImage()">✕</button>
+            </div>
+
+            <div id="filePreviewBox" class="preview-box">
+                <span id="filePreviewName" class="preview-text">📄 File Attached</span>
+                <button class="remove-btn" onclick="removeFile()">✕</button>
+            </div>
+
+            <!-- Input Controls -->
+            <div class="input-box">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)">
+                <input type="file" id="docInput" accept=".txt,.json,.csv,.js,.html,.css,.py,.md,.java,.cpp,.c" style="display: none;" onchange="handleFileSelect(event)">
+                
+                <button class="icon-btn" onclick="document.getElementById('imageInput').click()" title="Add Photo">📷</button>
+                <button class="icon-btn" onclick="document.getElementById('docInput').click()" title="Add File">📎</button>
+                <button class="icon-btn" id="micBtn" onclick="toggleMic()" title="Voice Input">🎙️</button>
+
+                <input type="text" id="userInput" placeholder="Type or speak..." onkeypress="handleKeyPress(event)">
+                <button class="send-btn" onclick="sendMsg()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DB_NAME = 'SandaruAI_SecureDB';
+        const DB_VERSION = 2;
+        let db = null;
+        let chats = [];
+        let currentChatId = null;
+        let currentUser = null;
+
+        let selectedImageBase64 = null;
+        let selectedFileText = null;
+        let selectedFileName = null;
+        let isWebSearchOn = false;
+        let recognition = null;
+        let isListening = false;
+
+        /* Database Setup with Authentication Support */
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                let request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = function(e) {
+                    let dbInstance = e.target.result;
+                    if (!dbInstance.objectStoreNames.contains('chats')) {
+                        dbInstance.createObjectStore('chats', { keyPath: 'id' });
+                    }
+                    if (!dbInstance.objectStoreNames.contains('users')) {
+                        dbInstance.createObjectStore('users', { keyPath: 'email' });
+                    }
+                };
+                request.onsuccess = function(e) {
+                    db = e.target.result;
+                    resolve(db);
+                };
+                request.onerror = function(e) {
+                    reject(e);
+                };
+            });
+        }
+
+        /* User Auth Storage Methods */
+        function getUserDB(email) {
+            return new Promise((resolve) => {
+                if (!db) return resolve(null);
+                let tx = db.transaction('users', 'readonly');
+                let store = tx.objectStore('users');
+                let req = store.get(email);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        function saveUserDB(user) {
+            return new Promise((resolve) => {
+                if (!db) return resolve();
+                let tx = db.transaction('users', 'readwrite');
+                let store = tx.objectStore('users');
+                store.put(user);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        /* Chat Storage Methods */
+        function getAllChatsDB() {
+            return new Promise((resolve) => {
+                if (!db || !currentUser) return resolve([]);
+                let tx = db.transaction('chats', 'readonly');
+                let store = tx.objectStore('chats');
+                let req = store.getAll();
+                req.onsuccess = () => {
+                    let all = req.result || [];
+                    let userChats = all.filter(c => c.userId === currentUser.email);
+                    resolve(userChats);
+                };
+                req.onerror = () => resolve([]);
+            });
+        }
+
+        function saveChatDB(chat) {
+            return new Promise((resolve) => {
+                if (!db || !currentUser) return resolve();
+                chat.userId = currentUser.email;
+                let tx = db.transaction('chats', 'readwrite');
+                let store = tx.objectStore('chats');
+                store.put(chat);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        function deleteChatDB(id) {
+            return new Promise((resolve) => {
+                if (!db) return resolve();
+                let tx = db.transaction('chats', 'readwrite');
+                let store = tx.objectStore('chats');
+                store.delete(id);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        /* Auth UI & Actions */
+        function switchAuthTab(tab) {
+            if (tab === 'login') {
+                document.getElementById('tabLogin').classList.add('active');
+                document.getElementById('tabSignup').classList.remove('active');
+                document.getElementById('loginForm').style.display = 'flex';
+                document.getElementById('signupForm').style.display = 'none';
+            } else {
+                document.getElementById('tabSignup').classList.add('active');
+                document.getElementById('tabLogin').classList.remove('active');
+                document.getElementById('signupForm').style.display = 'flex';
+                document.getElementById('loginForm').style.display = 'none';
+            }
+        }
+
+        async function doSignUp() {
+            let name = document.getElementById('signupName').value.trim();
+            let email = document.getElementById('signupEmail').value.trim().toLowerCase();
+            let pass = document.getElementById('signupPass').value;
+
+            if (!name || !email || !pass) {
+                alert('කරුණාකර සියලු විස්තර ඇතුළත් කරන්න.');
+                return;
+            }
+
+            let existing = await getUserDB(email);
+            if (existing) {
+                alert('මෙම Email එක මඟින් දැනටමත් Account එකක් සදා ඇත. Login වන්න.');
+                switchAuthTab('login');
+                return;
+            }
+
+            let newUser = { name, email, pass, createdAt: Date.now() };
+            await saveUserDB(newUser);
+            localStorage.setItem('sandaru_auth_session', email);
+            location.reload();
+        }
+
+        async function doLogin() {
+            let email = document.getElementById('loginEmail').value.trim().toLowerCase();
+            let pass = document.getElementById('loginPass').value;
+
+            if (!email || !pass) {
+                alert('කරුණාකර Email සහ Password ඇතුළත් කරන්න.');
+                return;
+            }
+
+            let user = await getUserDB(email);
+            if (!user || user.pass !== pass) {
+                alert('Email එක හෝ Password එක වැරදියි.');
+                return;
+            }
+
+            localStorage.setItem('sandaru_auth_session', email);
+            location.reload();
+        }
+
+        function doLogout() {
+            localStorage.removeItem('sandaru_auth_session');
+            location.reload();
+        }
+
+        /* App Initialization */
+        async function init() {
+            await initDB();
+
+            let sessionEmail = localStorage.getItem('sandaru_auth_session');
+            if (sessionEmail) {
+                currentUser = await getUserDB(sessionEmail);
+            }
+
+            if (!currentUser) {
+                document.getElementById('authScreen').style.display = 'flex';
+                return;
+            } else {
+                document.getElementById('authScreen').style.display = 'none';
+                document.getElementById('profileName').innerText = currentUser.name;
+                document.getElementById('profileEmail').innerText = currentUser.email;
+            }
+
+            chats = await getAllChatsDB();
+            chats.sort((a, b) => b.updatedAt - a.updatedAt);
+
+            if (chats.length === 0) {
+                createNewChat();
+            } else {
+                currentChatId = chats[0].id;
+                renderChatList();
+                loadCurrentChat();
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+
+        function toggleWebSearch() {
+            isWebSearchOn = !isWebSearchOn;
+            let btn = document.getElementById('searchBtn');
+            if (isWebSearchOn) {
+                btn.innerText = "🌐 Search: ON";
+                btn.classList.add('active');
+            } else {
+                btn.innerText = "🌐 Search: OFF";
+                btn.classList.remove('active');
+            }
+        }
+
+        async function createNewChat() {
+            let newId = 'chat_' + Date.now();
+            let newChat = {
+                id: newId,
+                userId: currentUser.email,
+                title: 'New Conversation',
+                updatedAt: Date.now(),
+                messages: [
+                    { sender: 'ai', text: `ආයුබෝවන් ${currentUser.name}! මම Sandaru AI. ඔබට අවශ්‍ය ඕනෑම දෙයක් අසන්න.` }
+                ]
+            };
+            chats.unshift(newChat);
+            currentChatId = newId;
+            await saveChatDB(newChat);
+            renderChatList();
+            loadCurrentChat();
+            if (document.getElementById('sidebar').classList.contains('open')) {
+                toggleSidebar();
+            }
+        }
+
+        function renderChatList() {
+            let list = document.getElementById('chatList');
+            list.innerHTML = '';
+            chats.forEach(chat => {
+                let div = document.createElement('div');
+                div.className = `chat-item ${chat.id === currentChatId ? 'active' : ''}`;
+                div.onclick = () => switchChat(chat.id);
+                
+                div.innerHTML = `
+                    <span class="chat-title">${escapeHTML(chat.title)}</span>
+                    <span class="delete-btn" onclick="deleteChat(event, '${chat.id}')">✕</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function switchChat(id) {
+            currentChatId = id;
+            renderChatList();
+            loadCurrentChat();
+            toggleSidebar();
+        }
+
+        async function deleteChat(e, id) {
+            e.stopPropagation();
+            chats = chats.filter(c => c.id !== id);
+            await deleteChatDB(id);
+            if (chats.length === 0) {
+                createNewChat();
+            } else {
+                if (currentChatId === id) currentChatId = chats[0].id;
+                renderChatList();
+                loadCurrentChat();
+            }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function formatMessageText(text) {
+            if (!text) return '';
+            let safeText = escapeHTML(text);
+            let formatted = safeText.replace(/\n/g, '<br>');
+            
+            formatted = formatted.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>');
+
+            let plainUrlRegex = /(^|[\s>(])(https?:\/\/[^\s<)]+)/g;
+            formatted = formatted.replace(plainUrlRegex, '$1<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-link">$2</a>');
+
+            return formatted;
+        }
+
+        function scrollToBottom() {
+            let chatDiv = document.getElementById('chat');
+            setTimeout(() => {
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            }, 60);
+        }
+
+        function loadCurrentChat() {
+            let chat = chats.find(c => c.id === currentChatId);
+            let chatDiv = document.getElementById('chat');
+            chatDiv.innerHTML = '';
+            if (chat) {
+                chat.messages.forEach(msg => {
+                    let senderLabel = msg.sender === 'user' ? 'You' : 'Sandaru AI';
+                    let msgClass = msg.sender === 'user' ? 'user' : 'ai';
+                    let imgHTML = msg.image ? `<br><img src="${msg.image}">` : '';
+                    let formattedContent = formatMessageText(msg.text);
+                    chatDiv.innerHTML += `<div class="msg ${msgClass}"><b>${senderLabel}:</b><br>${formattedContent}${imgHTML}</div>`;
+                });
+            }
+            scrollToBottom();
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMsg();
+        }
+
+        function handleImageSelect(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let img = new Image();
+                img.onload = function() {
+                    let canvas = document.createElement('canvas');
+                    let max_size = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height && width > max_size) {
+                        height *= max_size / width;
+                        width = max_size;
+                    } else if (height > max_size) {
+                        width *= max_size / height;
+                        height = max_size;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    let ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    document.getElementById('previewImg').src = selectedImageBase64;
+                    document.getElementById('imgPreviewBox').style.display = 'flex';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage() {
+            selectedImageBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imgPreviewBox').style.display = 'none';
+        }
+
+        function handleFileSelect(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+
+            selectedFileName = file.name;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                selectedFileText = e.target.result;
+                document.getElementById('filePreviewName').innerText = "📄 " + selectedFileName;
+                document.getElementById('filePreviewBox').style.display = 'flex';
+            };
+            reader.readAsText(file);
+        }
+
+        function removeFile() {
+            selectedFileText = null;
+            selectedFileName = null;
+            document.getElementById('docInput').value = '';
+            document.getElementById('filePreviewBox').style.display = 'none';
+        }
+
+        /* Speech Recognition */
+        function toggleMic() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Keyboard හි ඇති Mic (🎙️) Icon එක භාවිත කරන්න.');
+                return;
+            }
+
+            if (isListening) {
+                if (recognition) recognition.stop();
+                return;
+            }
+
+            try {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'si-LK';
+                recognition.continuous = false;
+                recognition.interimResults = true;
+
+                recognition.onstart = function() {
+                    isListening = true;
+                    document.getElementById('micBtn').classList.add('recording');
+                    document.getElementById('status').innerText = "🎙️ Listening...";
+                };
+
+                recognition.onresult = function(event) {
+                    let transcript = Array.from(event.results)
+                        .map(result => result[0])
+                        .map(result => result.transcript)
+                        .join('');
+                    document.getElementById('userInput').value = transcript;
+                };
+
+                recognition.onerror = function() {
+                    stopMicUI();
+                    alert('Text Box එක මත Click කර Keyboard හි Mic (🎙️) Icon එක භාවිත කරන්න.');
+                };
+
+                recognition.onend = function() {
+                    stopMicUI();
+                };
+
+                recognition.start();
+            } catch (e) {
+                stopMicUI();
+            }
+        }
+
+        function stopMicUI() {
+            isListening = false;
+            document.getElementById('micBtn').classList.remove('recording');
+            document.getElementById('status').innerText = "";
+        }
+
+        /* Search Engine API */
+        async function fetchWebResults(query) {
+            let results = [];
+            try {
+                let siUrl = `https://si.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json&origin=*`;
+                let resSi = await fetch(siUrl);
+                let dataSi = await resSi.json();
+                if (dataSi.query && dataSi.query.search) {
+                    dataSi.query.search.slice(0, 2).forEach(item => {
+                        results.push(`[Sinhala Data] ${item.title}: ${item.snippet.replace(/<[^>]*>?/gm, '')}`);
+                    });
+                }
+            } catch(e){}
+
+            try {
+                let enUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json&origin=*`;
+                let resEn = await fetch(enUrl);
+                let dataEn = await resEn.json();
+                if (dataEn.query && dataEn.query.search) {
+                    dataEn.query.search.slice(0, 2).forEach(item => {
+                        results.push(`[English Data] ${item.title}: ${item.snippet.replace(/<[^>]*>?/gm, '')}`);
+                    });
+                }
+            } catch(e){}
+
+            return results.length > 0 ? results.join("\n\n") : null;
+        }
+
+        function cleanAiResponse(text) {
+            if (!text) return '';
+            let cleaned = text;
+            cleaned = cleaned.replace(/Support Pollinations.*/gi, '');
+            cleaned = cleaned.replace(/Powered by Pollinations.*/gi, '');
+            cleaned = cleaned.replace(/🌸.*/gi, '');
+            return cleaned.trim();
+        }
+
+        async function sendMsg() {
+            let input = document.getElementById('userInput');
+            let text = input.value.trim();
+            if (!text && !selectedImageBase64 && !selectedFileText) return;
+
+            let chatObj = chats.find(c => c.id === currentChatId);
+            if (!chatObj) return;
+
+            let currentImg = selectedImageBase64;
+            let currentFileContent = selectedFileText;
+            let currentFileName = selectedFileName;
+
+            removeImage();
+            removeFile();
+
+            let displayMsgText = text;
+            if (currentFileName) {
+                displayMsgText = (text ? text + "\n" : "") + `[Attached File: ${currentFileName}]`;
+            }
+
+            if (chatObj.messages.length <= 1) {
+                chatObj.title = displayMsgText.substring(0, 22) + (displayMsgText.length > 22 ? '...' : '');
+                renderChatList();
+            }
+
+            chatObj.messages.push({ sender: 'user', text: displayMsgText, image: currentImg });
+            chatObj.updatedAt = Date.now();
+            await saveChatDB(chatObj);
+            loadCurrentChat();
+
+            input.value = '';
+            let status = document.getElementById('status');
+
+            let searchContext = null;
+            if (isWebSearchOn && text) {
+                status.innerText = "🌐 Searching Web...";
+                searchContext = await fetchWebResults(text);
+            }
+
+            status.innerText = "⚡ Thinking...";
+
+            let promptText = text;
+            if (searchContext) {
+                promptText += "\n\n[REAL-TIME LIVE SEARCH DATA]:\n" + searchContext;
+            }
+            if (currentFileContent) {
+                promptText += "\n\n[ATTACHED FILE CONTENT (" + currentFileName + ")]:\n" + currentFileContent.substring(0, 15000);
+            }
+
+            let sysInstruction = "You are Sandaru AI, a highly intelligent AI assistant. Respond strictly in clear, grammatically accurate Sinhala when asked in Sinhala, or in natural English when asked in English. Keep answers clear and helpful.";
+
+            try {
+                let res = await fetch("https://text.pollinations.ai/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: "system", content: sysInstruction },
+                            { role: "user", content: promptText }
+                        ],
+                        model: "openai",
+                        seed: Math.floor(Math.random() * 100000)
+                    })
+                });
+
+                let aiText = await res.text();
+                aiText = cleanAiResponse(aiText);
+
+                if (!aiText) aiText = "දෝෂයක් සිදු විය. කරුණාකර නැවත උත්සාහ කරන්න.";
+
+                chatObj.messages.push({ sender: 'ai', text: aiText });
+                chatObj.updatedAt = Date.now();
+                await saveChatDB(chatObj);
+                loadCurrentChat();
+            } catch (e) {
+                chatObj.messages.push({ sender: 'ai', text: 'සම්බන්ධතා දෝෂයක් සිදු විය. කරුණාකර නැවත උත්සාහ කරන්න.' });
+                chatObj.updatedAt = Date.now();
+                await saveChatDB(chatObj);
+                loadCurrentChat();
+            }
+
+            status.innerText = "";
+        }
+
+        init();
+    </script>
+</body>
+</html>
