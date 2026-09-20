@@ -114,7 +114,7 @@
         .icon-btn.recording { background: #f43f5e; color: white; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        /* 🔴 ABSOLUTE SCROLL FIX: Direct Native Scroll Window */
+        /* Absolute Native Scroll Window */
         #chat { 
             position: absolute;
             top: 60px;
@@ -553,7 +553,7 @@
             return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
 
-        /* 🟢 Advanced Markdown Formatter for Professional Output */
+        /* Advanced Markdown Formatter for Professional Output */
         function formatMarkdown(text) {
             if (!text) return '';
             
@@ -745,12 +745,6 @@
             }
         }
 
-        function stopMicUI() {
-            isListening = false;
-            document.getElementById('micBtn').classList.remove('recording');
-            document.getElementById('status').innerText = "";
-        }
-
         /* Web Search Engine API Integration */
         async function fetchWebResults(query) {
             let results = [];
@@ -786,6 +780,61 @@
             cleaned = cleaned.replace(/Powered by Pollinations.*/gi, '');
             cleaned = cleaned.replace(/🌸.*/gi, '');
             return cleaned.trim();
+        }
+
+        /* 🔴 MULTI-SERVER FALLBACK ENGINE: Multi-device & Multi-network Fix */
+        async function fetchAIResponse(promptText, sysInstruction) {
+            // Option 1: Primary Server Request (POST)
+            try {
+                let res = await fetch("https://text.pollinations.ai/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: "system", content: sysInstruction },
+                            { role: "user", content: promptText }
+                        ],
+                        model: "openai",
+                        seed: Math.floor(Math.random() * 100000)
+                    })
+                });
+
+                if (res.ok) {
+                    let aiText = await res.text();
+                    aiText = cleanAiResponse(aiText);
+                    if (aiText && !aiText.toLowerCase().includes("top up") && !aiText.toLowerCase().includes("rate limit") && !aiText.toLowerCase().includes("api key")) {
+                        return aiText;
+                    }
+                }
+            } catch (e) {}
+
+            // Option 2: Fallback Server Request (GET Query)
+            try {
+                let fullQuery = encodeURIComponent(sysInstruction + "\n\nUser Question: " + promptText);
+                let res = await fetch(`https://text.pollinations.ai/${fullQuery}?model=mistral`);
+                if (res.ok) {
+                    let aiText = await res.text();
+                    aiText = cleanAiResponse(aiText);
+                    if (aiText && !aiText.toLowerCase().includes("top up") && !aiText.toLowerCase().includes("rate limit")) {
+                        return aiText;
+                    }
+                }
+            } catch (e) {}
+
+            // Option 3: Fallback Server Request (Qwen Backup)
+            try {
+                let simpleQuery = encodeURIComponent(promptText);
+                let res = await fetch(`https://text.pollinations.ai/${simpleQuery}`);
+                if (res.ok) {
+                    let aiText = await res.text();
+                    aiText = cleanAiResponse(aiText);
+                    if (aiText && !aiText.toLowerCase().includes("top up") && !aiText.toLowerCase().includes("rate limit")) {
+                        return aiText;
+                    }
+                }
+            } catch (e) {}
+
+            return "දැනට AI Server එකෙහි අධික තදබදයක් පවතී. කරුණාකර මොහොතකින් නැවත උත්සාහ කරන්න.";
         }
 
         async function sendMsg() {
@@ -839,35 +888,12 @@
 
             let sysInstruction = "You are Sandaru AI, a highly intelligent AI assistant. Respond strictly in clear, grammatically accurate Sinhala when asked in Sinhala, or in natural English when asked in English. Format response neatly with bullet points, bolding, and code blocks where applicable.";
 
-            try {
-                let res = await fetch("https://text.pollinations.ai/", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        messages: [
-                            { role: "system", content: sysInstruction },
-                            { role: "user", content: promptText }
-                        ],
-                        model: "openai",
-                        seed: Math.floor(Math.random() * 100000)
-                    })
-                });
+            let aiText = await fetchAIResponse(promptText, sysInstruction);
 
-                let aiText = await res.text();
-                aiText = cleanAiResponse(aiText);
-
-                if (!aiText) aiText = "දෝෂයක් සිදු විය. කරුණාකර නැවත උත්සාහ කරන්න.";
-
-                chatObj.messages.push({ sender: 'ai', text: aiText });
-                chatObj.updatedAt = Date.now();
-                await saveChatDB(chatObj);
-                loadCurrentChat();
-            } catch (e) {
-                chatObj.messages.push({ sender: 'ai', text: 'සම්බන්ධතා දෝෂයක් සිදු විය. කරුණාකර නැවත උත්සාහ කරන්න.' });
-                chatObj.updatedAt = Date.now();
-                await saveChatDB(chatObj);
-                loadCurrentChat();
-            }
+            chatObj.messages.push({ sender: 'ai', text: aiText });
+            chatObj.updatedAt = Date.now();
+            await saveChatDB(chatObj);
+            loadCurrentChat();
 
             status.innerText = "";
         }
